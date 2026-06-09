@@ -1,3 +1,6 @@
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import { PrismaClient } from "@prisma/client";
 import { JsonObject } from "@prisma/client/runtime/library";
 import { Kafka } from "kafkajs";
