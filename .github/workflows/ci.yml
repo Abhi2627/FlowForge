@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-primary-backend:
+    name: Typecheck primary-backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: primary-backend/package-lock.json
+      - name: Install dependencies
+        run: npm install
+        working-directory: primary-backend
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: primary-backend
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: primary-backend
+
+  typecheck-hooks:
+    name: Typecheck hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hooks/package-lock.json
+      - name: Install dependencies
+        run: npm install
+        working-directory: hooks
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: hooks
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: hooks
+
+  typecheck-processor:
+    name: Typecheck processor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: processor/package-lock.json
+      - name: Install dependencies
+        run: npm install
+        working-directory: processor
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: processor
+
+  typecheck-worker:
+    name: Typecheck worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - name: Install dependencies
+        run: npm install
+        working-directory: worker
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: worker
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: worker
+
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm install
+        working-directory: frontend
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_BACKEND_URL: http://localhost:3000
+          NEXT_PUBLIC_HOOKS_URL: http://localhost:3002
