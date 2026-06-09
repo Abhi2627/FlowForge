@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables - never commit real .env files
+.env
+.env.local
+.env.production
+
+# TypeScript build output
+dist/
+
+# Next.js build output
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
