@@ -71,10 +71,27 @@ model ZapRun {
   metadata     Json
   zap          Zap           @relation(fields: [zapId], references: [id])
   zapRunOutbox ZapRunOutbox?
+  logs         ZapRunLog[]
 }
 
 model ZapRunOutbox {
   id       String @id @default(uuid())
   zapRunId String @unique
   zapRun   ZapRun @relation(fields: [zapRunId], references: [id])
+}
+
+enum ZapRunStatus {
+  SUCCESS
+  FAILED
+}
+
+model ZapRunLog {
+  id          String       @id @default(uuid())
+  zapRunId    String
+  zapRun      ZapRun       @relation(fields: [zapRunId], references: [id])
+  stage       Int
+  actionId    String
+  status      ZapRunStatus
+  error       String?
+  executedAt  DateTime     @default(now())
 }

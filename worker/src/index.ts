@@ -72,17 +72,45 @@ async function main() {
 
             if (!handler) {
                 console.error(`[worker] no handler registered for action '${actionId}', skipping`);
+                await prismaClient.zapRunLog.create({
+                    data: {
+                        zapRunId,
+                        stage,
+                        actionId,
+                        status: "FAILED",
+                        error: `No handler registered for action '${actionId}'`
+                    }
+                });
                 await commitOffset(consumer, TOPIC_NAME, partition, message.offset);
                 return;
             }
 
             try {
                 await handler(currentAction.metadata as JsonObject, zapRunDetails.metadata);
+
+                await prismaClient.zapRunLog.create({
+                    data: {
+                        zapRunId,
+                        stage,
+                        actionId,
+                        status: "SUCCESS"
+                    }
+                });
+
                 console.log(`[worker] action '${actionId}' at stage ${stage} completed`);
             } catch (err) {
-                console.error(`[worker] action '${actionId}' at stage ${stage} failed:`, err);
-                // Commit offset even on failure to avoid infinite retry loop
-                // Phase 4 will add ZapRunLog to persist this failure for the UI
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                console.error(`[worker] action '${actionId}' at stage ${stage} failed:`, errorMessage);
+
+                await prismaClient.zapRunLog.create({
+                    data: {
+                        zapRunId,
+                        stage,
+                        actionId,
+                        status: "FAILED",
+                        error: errorMessage
+                    }
+                });
             }
 
             const lastStage = zapRunDetails.zap.actions.length - 1;
