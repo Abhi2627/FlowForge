@@ -11,6 +11,7 @@ interface Zap {
     id: string;
     triggerId: string;
     userId: number;
+    createdAt: string;
     actions: {
         id: string;
         zapId: string;
@@ -81,16 +82,16 @@ function ZapTable({ zaps }: { zaps: Zap[] }) {
 
     return (
         <div className="p-8 max-w-screen-lg w-full">
-            <div className="flex">
+            <div className="flex font-semibold text-slate-600 border-b pb-2 mb-2">
                 <div className="flex-1">Name</div>
                 <div className="flex-1">ID</div>
-                <div className="flex-1">Created at</div>
+                <div className="flex-1">Created At</div>
                 <div className="flex-1">Webhook URL</div>
-                <div className="flex-1">Go</div>
+                <div className="flex-1">Runs</div>
             </div>
             {zaps.map(z => (
-                <div key={z.id} className="flex border-b border-t py-4">
-                    <div className="flex-1 flex">
+                <div key={z.id} className="flex border-b py-4 items-center">
+                    <div className="flex-1 flex items-center gap-1">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={z.trigger.type.image} alt={z.trigger.type.name} className="w-[30px] h-[30px]" />
                         {z.actions.map(x => (
@@ -98,11 +99,19 @@ function ZapTable({ zaps }: { zaps: Zap[] }) {
                             <img key={x.id} src={x.type.image} alt={x.type.name} className="w-[30px] h-[30px]" />
                         ))}
                     </div>
-                    <div className="flex-1">{z.id}</div>
-                    <div className="flex-1">Nov 13, 2023</div>
-                    <div className="flex-1">{`${HOOKS_URL}/hooks/catch/1/${z.id}`}</div>
+                    <div className="flex-1 text-sm font-mono text-slate-500 truncate pr-2">{z.id}</div>
+                    <div className="flex-1 text-sm text-slate-600">
+                        {new Date(z.createdAt).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric"
+                        })}
+                    </div>
+                    <div className="flex-1 text-xs text-slate-400 truncate pr-2">
+                        {`${HOOKS_URL}/hooks/catch/1/${z.id}`}
+                    </div>
                     <div className="flex-1">
-                        <LinkButton onClick={() => router.push("/zap/" + z.id)}>Go</LinkButton>
+                        <LinkButton onClick={() => router.push("/zap/" + z.id)}>View Runs</LinkButton>
                     </div>
                 </div>
             ))}
