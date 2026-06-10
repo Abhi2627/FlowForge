@@ -17,7 +17,8 @@
     "bs58": "^6.0.0",
     "dotenv": "^16.4.5",
     "kafkajs": "^2.2.4",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "resend": "^6.12.4"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
