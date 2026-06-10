@@ -1,36 +1,92 @@
-import express from "express"
-import {PrismaClient } from "@prisma/client";
+import express from "express";
+import rateLimit from "express-rate-limit";
+import { PrismaClient } from "@prisma/client";
 
 const client = new PrismaClient();
-
 const app = express();
 app.use(express.json());
 
-// https://hooks.zapier.com/hooks/catch/17043103/22b8496/
-// password logic
-app.post("/hooks/catch/:userId/:zapId", async (req, res) => {
+// Rate limit: max 30 webhook deliveries per minute per IP
+// Protects against webhook flooding and abuse
+const webhookRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests, please try again later." }
+});
+
+app.post("/hooks/catch/:userId/:zapId", webhookRateLimiter, async (req, res) => {
     const userId = req.params.userId;
     const zapId = req.params.zapId;
     const body = req.body;
 
-    // store in db a new trigger
-    await client.$transaction(async tx => {
-        const run = await tx.zapRun.create({
-            data: {
-                zapId: zapId,
-                metadata: body
+    // Idempotency: if the caller supplies an X-Idempotency-Key header,
+    // check if we already processed a run with that key. If so, return
+    // the existing run ID instead of creating a duplicate.
+    const idempotencyKey = req.headers["x-idempotency-key"] as string | undefined;
+
+    if (idempotencyKey) {
+        const existingRun = await client.zapRun.findFirst({
+            where: {
+                zapId,
+                metadata: {
+                    path: ["_idempotencyKey"],
+                    equals: idempotencyKey
+                }
             }
-        });;
+        });
+
+        if (existingRun) {
+            console.log(`[hooks] duplicate delivery detected for key=${idempotencyKey}, returning existing run`);
+            return res.json({
+                message: "Webhook already processed",
+                zapRunId: existingRun.id,
+                duplicate: true
+            });
+        }
+    }
+
+    // Validate that the zap exists and belongs to the userId
+    const zap = await client.zap.findFirst({
+        where: {
+            id: zapId,
+            userId: parseInt(userId)
+        }
+    });
+
+    if (!zap) {
+        return res.status(404).json({ message: "Zap not found" });
+    }
+
+    // Store idempotency key in metadata so we can look it up above on retries
+    const metadata = idempotencyKey
+        ? { ...body, _idempotencyKey: idempotencyKey }
+        : body;
+
+    const run = await client.$transaction(async tx => {
+        const zapRun = await tx.zapRun.create({
+            data: {
+                zapId,
+                metadata
+            }
+        });
 
         await tx.zapRunOutbox.create({
-            data: {
-                zapRunId: run.id
-            }
-        })
-    })
-    res.json({
-        message: "Webhook received"
-    })
-})
+            data: { zapRunId: zapRun.id }
+        });
 
-app.listen(3002);
+        return zapRun;
+    });
+
+    console.log(`[hooks] zapRun created: ${run.id} for zapId=${zapId}`);
+
+    return res.json({
+        message: "Webhook received",
+        zapRunId: run.id
+    });
+});
+
+app.listen(3002, () => {
+    console.log("[hooks] running on port 3002");
+});
