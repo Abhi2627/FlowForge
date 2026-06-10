@@ -6,7 +6,7 @@ import { authMiddleware } from "../middleware";
 import { SigninSchema, SignupSchema } from "../types";
 import { prismaClient } from "../db";
 import { JWT_PASSWORD } from "../config";
-import { sendVerificationEmail } from "../email";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../email";
 
 const SALT_ROUNDS = 10;
 const router = Router();
@@ -28,7 +28,7 @@ router.post("/signup", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(parsedData.data.password, SALT_ROUNDS);
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prismaClient.user.create({
         data: {
@@ -105,6 +105,74 @@ router.post("/signin", async (req, res) => {
     const token = jwt.sign({ id: user.id }, JWT_PASSWORD);
 
     return res.json({ token });
+});
+
+router.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await prismaClient.user.findFirst({
+        where: { email }
+    });
+
+    // Always return success to prevent email enumeration attacks
+    if (!user) {
+        return res.json({ message: "If that email exists, a reset link has been sent." });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await prismaClient.user.update({
+        where: { id: user.id },
+        data: {
+            verificationToken: resetToken,
+            verificationTokenExpiry: resetTokenExpiry
+        }
+    });
+
+    await sendPasswordResetEmail(email, resetToken);
+
+    return res.json({ message: "If that email exists, a reset link has been sent." });
+});
+
+router.post("/reset-password", async (req, res) => {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+        return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const user = await prismaClient.user.findFirst({
+        where: {
+            verificationToken: token,
+            verificationTokenExpiry: { gt: new Date() }
+        }
+    });
+
+    if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    await prismaClient.user.update({
+        where: { id: user.id },
+        data: {
+            password: hashedPassword,
+            verificationToken: null,
+            verificationTokenExpiry: null
+        }
+    });
+
+    return res.json({ message: "Password reset successfully. You can now sign in." });
 });
 
 router.get("/", authMiddleware, async (req, res) => {
