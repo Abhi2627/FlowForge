@@ -26,11 +26,13 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok,stat,mntr"
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
-      interval: 5s
-      timeout: 5s
+      test: ["CMD-SHELL", "bash -c 'echo ruok | timeout 2 bash -c \"cat >/dev/tcp/localhost/2181\" && echo imok'"]
+      interval: 10s
+      timeout: 10s
       retries: 10
+      start_period: 30s
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -53,6 +55,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+      start_period: 30s
 
   # ─── Application Services ─────────────────────────────────────────
 

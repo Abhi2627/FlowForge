@@ -1,3 +1,6 @@
+import * as dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { PrismaClient } from "@prisma/client";
@@ -21,9 +24,6 @@ app.post("/hooks/catch/:userId/:zapId", webhookRateLimiter, async (req, res) => 
     const zapId = req.params.zapId;
     const body = req.body;
 
-    // Idempotency: if the caller supplies an X-Idempotency-Key header,
-    // check if we already processed a run with that key. If so, return
-    // the existing run ID instead of creating a duplicate.
     const idempotencyKey = req.headers["x-idempotency-key"] as string | undefined;
 
     if (idempotencyKey) {
@@ -47,7 +47,6 @@ app.post("/hooks/catch/:userId/:zapId", webhookRateLimiter, async (req, res) => 
         }
     }
 
-    // Validate that the zap exists and belongs to the userId
     const zap = await client.zap.findFirst({
         where: {
             id: zapId,
@@ -59,7 +58,6 @@ app.post("/hooks/catch/:userId/:zapId", webhookRateLimiter, async (req, res) => 
         return res.status(404).json({ message: "Zap not found" });
     }
 
-    // Store idempotency key in metadata so we can look it up above on retries
     const metadata = idempotencyKey
         ? { ...body, _idempotencyKey: idempotencyKey }
         : body;
